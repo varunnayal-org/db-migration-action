@@ -1,0 +1,43 @@
+# Generate github metadata file action.yml for generating db migrations
+name: 'DB Migrations'
+description: 'Run DB migrations'
+inputs:
+  github-token:
+    description: 'Github token'
+    required: true
+  pr-base-branch:
+    description: 'Base branch on which DB migration action is available. You need to raise a PR for this branch as base branch.'
+    default: 'main'
+  migration-db-url:
+    description: 'Migration DB URL'
+    required: true
+  migration-dir:
+    description: 'Migration directory'
+    default: 'migrations'
+  approval-teams:
+    description: 'List of teams that has authority to approve'
+    required: true
+  debug:
+    description: 'show debug logs (true|false)'
+    default: 'false'
+
+branding:
+  icon: 'database'
+  color: 'purple'
+runs:
+  using: composite
+  steps:
+    - name: checkout repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ env.GITHUB_SHA }}
+    - name: list_node_version
+      shell: bash
+      run: |
+        node -v
+
+    - name: migration approvals
+      shell: bash
+      run: node $GITHUB_ACTION_PATH/index.js
+  # using: 'node16'
+  # main: 'index.js'
