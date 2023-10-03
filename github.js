@@ -1,13 +1,15 @@
 const core = require('@actions/core');
 const { getOctokit } = require('@actions/github');
+const { getEnv } = require('./util');
 
 function isPREvent(event) {
   return event.issue && event.issue.pull_request;
 }
 
 function buildOctokit(opts = {}) {
-  const token = core.getInput('github-token', { required: true });
-  const debug = core.getBooleanInput('debug') || false;
+  const token = getEnv('REPO_TOKEN');
+  let debug = process.env.DEBUG || 'false';
+  debug = debug === 'true' || debug === '1';
   const octokit = getOctokit(token, {
     debug,
     ...opts,
@@ -107,10 +109,27 @@ async function updateComment(octokit, repoOwner, repoName, commentId, message) {
   });
 }
 
+async function addLabel(octokit, repoOwner, repoName, prNumber, label) {
+  const existingLabels = JSON.parse(getEnv('PR_LABELS') || '[]').map((label) => label.name);
+  if (existingLabels.includes(label)) {
+    console.debug(`PR already has label ${label}`);
+    return;
+  }
+
+  // Add the label to the PR
+  await octokit.rest.issues.addLabels({
+    owner: repoOwner,
+    repo: repoName,
+    issue_number: prNumber,
+    labels: [label],
+  });
+}
+
 module.exports = {
   getMatchingTeams,
   getPRInfo,
   isPREvent,
   buildOctokit,
   updateComment,
+  addLabel,
 };

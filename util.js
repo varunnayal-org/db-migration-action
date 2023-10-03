@@ -12,7 +12,16 @@ async function removeDir(dirName) {
   }
 }
 
+function getEnv(envName) {
+  const value = process.env[envName];
+  if (typeof value === 'undefined') {
+    throw new Error(`Environment variable ${envName} is not set`);
+  }
+  return value;
+}
+
 module.exports = {
   createTempDir,
   removeDir,
+  getEnv,
 };

@@ -4,18 +4,18 @@ const path = require('path');
 
 const { createTempDir, removeDir } = require('./util');
 
-function buildMigrationConfig(databaseURL, migrationsDir) {
+function buildMigrationConfig(databaseURL, migrationsDir, dryRun = false) {
   return {
     databaseUrl: databaseURL,
     dir: migrationsDir,
     migrationsTable: process.env.MIGRATIONS_TABLE || 'migrations',
     direction: 'up',
     checkOrder: true,
-    dryRun: true,
+    dryRun,
   };
 }
 
-async function copySqlMigrationToJS(sourceDir, destinationDir) {
+async function ensureSQLFilesInMigrationDir(sourceDir, destinationDir) {
   // Read files in source directory
   console.debug(`Reading from: ${sourceDir}`);
   const files = fs.readdirSync(sourceDir);
@@ -23,29 +23,10 @@ async function copySqlMigrationToJS(sourceDir, destinationDir) {
   // Filter only SQL files
   const sqlFiles = files.filter((file) => path.extname(file) === '.sql');
 
+  // Copy files to destination dir
   for (const file of sqlFiles) {
     const filePath = path.join(sourceDir, file);
-
-    // Create JS content
-    const baseName = path.basename(file, '.sql');
-    const jsFileName = `${baseName}.js`;
-    const jsFilePath = path.join(destinationDir, jsFileName);
-
-    const jsContent = `
-const path = require('path');
-const fs = require('fs');
-
-const sql = fs.readFileSync(path.join(__dirname, '${filePath}'), 'utf8');
-
-module.exports = {
-    up: (pgm) => {
-        pgm.sql(sql);
-    },
-};
-`;
-
-    // Write the JS content to the file
-    fs.writeFileSync(jsFilePath, jsContent);
+    fs.copyFileSync(filePath, path.join(destinationDir, file));
   }
 }
 
@@ -54,16 +35,18 @@ async function runMigrations(migrationConfig) {
   try {
     // setup sql -> js for node-pg-migrate
     migrationJsDir = await createTempDir('migrations-js');
-    await copySqlMigrationToJS(migrationConfig.dir, migrationJsDir);
+    await ensureSQLFilesInMigrationDir(migrationConfig.dir, migrationJsDir);
+    migrationConfig.dir = migrationJsDir;
 
     // migrate
-    await migrate(migrationConfig);
+    // output: [{path:'/path/to/12312.sql', name: '12312', timestamp: 20230921102752}, ...]
+    const response = await migrate(migrationConfig);
 
-    console.log('Migrations run successfully');
+    return response.map((file) => `${file.name}.sql`);
   } catch (error) {
     console.error('Failed to run migrations:', error);
   } finally {
-    removeDir(migrationJsDir);
+    await removeDir(migrationJsDir);
   }
 }
 

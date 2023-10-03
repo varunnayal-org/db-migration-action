@@ -2,18 +2,18 @@
 name: 'DB Migrations'
 description: 'Run DB migrations'
 inputs:
-  github-token:
+  repo-token:
     description: 'Github token'
     required: true
   pr-base-branch:
     description: 'Base branch on which DB migration action is available. You need to raise a PR for this branch as base branch.'
-    default: 'main'
+    default: 'master'
   migration-db-url:
     description: 'Migration DB URL'
     required: true
   migration-dir:
     description: 'Migration directory'
-    default: 'migrations'
+    default: './migrations'
   approval-teams:
     description: 'List of teams that has authority to approve'
     required: true
@@ -27,17 +27,34 @@ branding:
 runs:
   using: composite
   steps:
-    - name: checkout repo
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ env.GITHUB_SHA }}
-    - name: list_node_version
+    - name: Fetch PR details
+      id: pr_details
+      shell: bash
+      env:
+        REPO_TOKEN: ${{ inputs.repo-token }}
+      run: |
+        PR_DETAILS=$(curl -s -L -H "Authorization: token $REPO_TOKEN" "${{ github.event.issue.pull_request.url }}")
+        # echo "PR_DETAILS=$PR_DETAILS" >> $GITHUB_ENV
+        echo "::set-output name=head_sha::$(echo "$PR_DETAILS" | jq -r .head.sha)"
+        echo "::set-output name=labels::$(echo "$PR_DETAILS" | jq -c .labels)"
+    - name: set head branch
       shell: bash
       run: |
-        node -v
-
+        echo ${{ steps.pr_details.outputs.head_sha }}
+    # For local testing, uncomment "checkout repo" and paste it in main
+    # workflow just above where this action is being used
+    - name: checkout repo
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ steps.pr_details.outputs.head_sha }}
     - name: migration approvals
       shell: bash
       run: node $GITHUB_ACTION_PATH/index.js
-  # using: 'node16'
-  # main: 'index.js'
+      env:
+        REPO_TOKEN: ${{ inputs.repo-token }}
+        DEBUG: ${{ inputs.debug }}
+        MIGRATION_DB_URL: ${{ inputs.migration-db-url }}
+        MIGRATION_DIR: ${{ inputs.migration-dir }}
+        APPROVAL_TEAMS: ${{ inputs.approval-teams }}
+        PR_BASE_BRANCH: ${{ inputs.pr-base-branch }}
+        PR_LABELS: ${{ steps.pr_details.outputs.labels }}
