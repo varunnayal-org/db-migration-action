@@ -1,12 +1,26 @@
 # Migration GHA
 
-## Links
+## Features
 
-- Env [GITHUB_API_URL](https://docs.github.com/en/actions/creating-actions/about-custom-actions#compatibility-with-github-enterprise-server)
+- Use `/migrate approved` comment on PR to run migrations
+  - Comment from PR owner will not work
+  - Post execution, comment is updated with execution status
+- Use `/migrate dry-run` to dry run the migrations.
+- Successful execution(with or without dry run) will list the files being picked for migration.
+- Label `db-migration` is added to the PR
+- Will only work is PR is open. Draft PRs will be ignored
+
+## Token Permission
+
+Create a classic token (Fine-grained token has not been tested). Permission scopes required
+
+- `repo:status`
+- `public_repo`
+- `read:org`
 
 ## Parameters
 
-### github-token
+### repo-token
 
 It can be picked directly from `${{ secrets.GITHUB_TOKEN }}`
 
@@ -14,9 +28,9 @@ It can be picked directly from `${{ secrets.GITHUB_TOKEN }}`
 
 This Github Action runs when a comment is added in a PR.
 This is to allow only custom branch.
-For ex, if we want to allow this action to run on any PRs raised to `main` branch(i.e. `release-xyz` merging into `main`), then we'll set the value as `main`.
+For ex, if we want to allow this action to run on any PRs raised to `master` branch(i.e. `release-xyz` merging into `master`), then we'll set the value as `master`.
 
-Defaults to `main`.
+Defaults to `master`.
 
 ### migration-db-url
 
