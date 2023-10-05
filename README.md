@@ -18,6 +18,48 @@ Create a classic token (Fine-grained token has not been tested). Permission scop
 - `public_repo`
 - `read:org`
 
+## TODO
+
+- [ ] Support for multiple environments based on regulations. Eg: PCI and non PCI environments
+- [ ] AWS integrations
+  - [ ] Secrets manager integration to read secrets
+  - [ ] DynamoDB integration to store
+    - [ ] who all approved the migrations(JIRA ticket, member of GitHub team)
+- [ ] JIRA integration
+  - [ ] Create a ticket in JIRA to get approval
+  - [ ] Webhooks for JIRA whenever the ticket is approved
+- [ ] Option to execute schema migrations only at a given window
+- [ ] Option to [review SQL](https://www.bytebase.com/docs/tutorials/github-database-cicd-part-1-sql-review-github-actions/)
+
+- [ ] Migration for multiple databases from same repository (users and transactions db)
+
+Below configuration might work. This would mean we'd not required `migration-db-url`, `approval-teams` from [action.yml](./action.yml)
+
+```js
+module.exports = {
+  "defaults": {
+    "base_directory": "./migrations",
+    "secret_provider": {
+      "provider": "aws",
+      "path": "enter path here or better read from GITHUB organization secrets",
+    },
+    "github_token_provider_path": "key to read from secret provider to get github token"
+  },
+  "databases": [
+    {
+      "directory": "users, so complete path is `{base_directory}/${users}",
+      "url_path": "for aws, it'll be key in secret that holds db URL",
+      "teams": ["db-champions: list of users who are allowed to review PR from SQL. These users will enter /migrate command in PR"]
+    },
+    {
+      "directory": "transactions",
+      "migration-db-url-env": "MIGRATION_DB_URL_TXNS",
+      "teams": ["admin", "dba"]
+    }
+  ]
+}
+```
+
 ## Parameters
 
 ### repo-token
@@ -47,26 +89,3 @@ List of GitHub Teams that are authorized to run migrations.
 ### debug
 
 Used to enable debug logs. Either `true` or `false`.
-
-## TODO
-
-- [ ] Migration for multiple databases from same repository (users and transactions db)
-
-Below configuration might work. This would mean we'd not required `migration-db-url`, `approval-teams` from [action.yml](./action.yml)
-
-```js
-module.exports = [
-  {
-    "directory": "users",
-    "migration-db-url-env": "MIGRATION_DB_URL_USERS",
-    "teams": ["admin", "dba", "data"]
-  },
-  {
-    "directory": "transactions",
-    "migration-db-url-env": "MIGRATION_DB_URL_TXNS",
-    "teams": ["admin", "dba"]
-  }
-]
-```
-
-- [ ] Migration for multiple entities from same repository(deploy in account1 and account2)
