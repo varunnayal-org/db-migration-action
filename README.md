@@ -20,6 +20,7 @@ Create a classic token (Fine-grained token has not been tested). Permission scop
 
 ## TODO
 
+- [ ] Partitioning handling
 - [ ] Support for multiple environments based on regulations. Eg: PCI and non PCI environments
 - [ ] AWS integrations
   - [ ] Secrets manager integration to read secrets
