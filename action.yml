@@ -24,6 +24,8 @@ branding:
 runs:
   using: composite
   steps:
+    - name: Print GitHub Context
+      run: echo "${{ toJson(github) }}"
     - name: Fetch PR details
       id: pr_details
       shell: bash
