@@ -107,7 +107,7 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
   result.awsClient = awsClient;
 
   const secretKeys = config.databases.map((db) => db.url_path);
-  const secretValues = await awsClient.getSecrets(secretKeys);
+  const secretValues = await awsClient.getSecrets(config.aws_secret_provider.path, secretKeys);
 
   result.migrationConfigList = config.databases.map((db) => {
     const { directory, url_path } = db;
