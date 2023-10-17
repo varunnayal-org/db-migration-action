@@ -28,8 +28,8 @@ function buildConfig() {
   console.log(path.join(process.cwd(), 'db.migration.json'));
   console.log(fs.existsSync(path.join(process.cwd(), 'db.migration.json')));
   console.log('MIGRATION_CONFIG_FILE: ', process.env.MIGRATION_CONFIG_FILE);
-  // const config = require(process.env.MIGRATION_CONFIG_FILE || './db.migration.json');
   const config = require(process.env.MIGRATION_CONFIG_FILE || path.join(process.cwd(), 'db.migration.json'));
+  console.log(config);
   if (!config.base_directory) {
     config.base_directory = 'migrations';
   }
