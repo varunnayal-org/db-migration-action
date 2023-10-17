@@ -38,10 +38,10 @@ runs:
       shell: bash
       run: |
         echo ${{ steps.pr_details.outputs.head_sha }}
-    # For local testing, uncomment "checkout repo" and paste it in main
-    # workflow just above where this action is being used
-    - name: checkout repo
-      uses: actions/checkout@v3
+    # # For local testing, uncomment "checkout repo" and paste it in main
+    # # workflow just above where this action is being used
+    # - name: checkout repo
+    #   uses: actions/checkout@v3
       with:
         ref: ${{ steps.pr_details.outputs.head_sha }}
     - name: migration approvals
