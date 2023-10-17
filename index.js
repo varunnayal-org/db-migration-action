@@ -70,7 +70,7 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
     console.debug('ignoring comment');
     result.errMsg.invalidComment = 'ignoring comment';
     result.errorMessage = result.errMsg.invalidComment;
-    return;
+    return result;
   }
 
   if (result.dryRun === true) {
@@ -83,12 +83,14 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
   console.log(`Fetching PR info for ${repoOwner}/${repoName}#${prNumber}`);
   const prInfo = await ghClient.getPRInfo(prNumber);
 
-  const errMsg = validatePR(prInfo, prBaseBranchName, commentOwner, dryRun);
+  new Client(organization, repoName);
+
+  const errMsg = validatePR(prInfo, prBaseBranchName, commentOwner, result.dryRun);
   if (errMsg) {
     result.errMsg.invalidPR = errMsg;
     result.errorMessage = result.errMsg.invalidPR;
     console.error(errMsg);
-    return;
+    return result;
   }
 
   if (actionOrigin === 'github') {
@@ -99,7 +101,7 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
       result.errMsg.invalidTeam = `User ${commentOwner} is not a member of any of the required teams: ${config.teams}`;
       console.error(result.errMsg.invalidTeam);
       result.errorMessage = result.errMsg.invalidTeam;
-      return;
+      return result;
     }
   }
 
@@ -133,12 +135,12 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
     result.errMsg.invalidDryRun = migrationErrMsg;
     console.error(migrationErrMsg);
     result.errorMessage = migrationErrMsg;
-    return;
+    return result;
   } else if (migrationAvailable === false) {
     result.errMsg.noFilesToRun = 'No migrations available';
     console.debug(result.errMsg.noFilesToRun);
     result.errorMessage = result.errMsg.noFilesToRun;
-    return;
+    return result;
   }
 
   return result;
@@ -179,6 +181,8 @@ async function fromGithub(event) {
     commentBody: event.comment.body,
     commentOwner: event.comment.user.login,
   });
+
+  console.log('Result: ', result);
   const commentBuilder = getUpdatedComment(event.comment.body, result.msgPrefix);
 
   if (result.errorMessage) {
