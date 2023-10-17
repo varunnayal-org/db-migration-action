@@ -4,11 +4,11 @@ const path = require('path');
 
 const { createTempDir, removeDir } = require('./util');
 
-function buildMigrationConfig(databaseURL, migrationsDir, dryRun = false) {
+function buildMigrationConfig(databaseURL, migrationsDir, directory, dryRun = false) {
   return {
     databaseUrl: databaseURL,
     dir: migrationsDir,
-    migrationsTable: process.env.MIGRATIONS_TABLE || 'migrations',
+    migrationsTable: directory,
     direction: 'up',
     checkOrder: true,
     dryRun,
@@ -43,9 +43,9 @@ async function runMigrations(migrationConfig) {
     const response = await migrate(migrationConfig);
 
     return response.map((file) => `${file.name}.sql`);
-  } catch (error) {
+  } /* catch (error) {
     console.error('Failed to run migrations:', error);
-  } finally {
+  } */ finally {
     await removeDir(migrationJsDir);
   }
 }

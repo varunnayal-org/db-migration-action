@@ -20,7 +20,9 @@ Create a classic token (Fine-grained token has not been tested). Permission scop
 
 ## TODO
 
-- [ ] Partitioning handling
+- [ ] PG features
+  - [ ] Partition
+  - [ ] Inheritance
 - [ ] Support for multiple environments based on regulations. Eg: PCI and non PCI environments
 - [ ] AWS integrations
   - [ ] Secrets manager integration to read secrets
@@ -90,3 +92,17 @@ List of GitHub Teams that are authorized to run migrations.
 ### debug
 
 Used to enable debug logs. Either `true` or `false`.
+
+## AWS Local
+
+Run AWS local using command
+
+```
+localstack start -d
+```
+
+Run DynamoDB web ui using
+
+```
+AWS_PROFILE=local DYNAMO_ENDPOINT=http://localhost:4566 dynamodb-admin
+```

@@ -8,12 +8,9 @@ inputs:
   pr-base-branch:
     description: 'Base branch on which DB migration action is available. You need to raise a PR for this branch as base branch.'
     default: 'master'
-  migration-db-url:
-    description: 'Migration DB URL'
-    required: true
-  migration-dir:
-    description: 'Migration directory'
-    default: './migrations'
+  migration-config-file:
+    description: 'Migration configuration file'
+    default: './db.migration.json'
   approval-teams:
     description: 'List of teams that has authority to approve'
     required: true
@@ -53,8 +50,9 @@ runs:
       env:
         REPO_TOKEN: ${{ inputs.repo-token }}
         DEBUG: ${{ inputs.debug }}
-        MIGRATION_DB_URL: ${{ inputs.migration-db-url }}
-        MIGRATION_DIR: ${{ inputs.migration-dir }}
+        # MIGRATION_DB_URL: ${{ inputs.migration-db-url }}
+        # MIGRATION_DIR: ${{ inputs.migration-dir }}
+        MIGRATION_CONFIG_DIR: ${{ inputs.migration-config-file }}
         APPROVAL_TEAMS: ${{ inputs.approval-teams }}
         PR_BASE_BRANCH: ${{ inputs.pr-base-branch }}
         PR_LABELS: ${{ steps.pr_details.outputs.labels }}
