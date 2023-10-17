@@ -27,6 +27,7 @@ runs:
     - name: Fetch PR details
       id: pr_details
       shell: bash
+      # if: ${{ !env.ACT }}
       env:
         REPO_TOKEN: ${{ inputs.repo-token }}
       run: |
@@ -36,12 +37,12 @@ runs:
         echo "::set-output name=labels::$(echo "$PR_DETAILS" | jq -c .labels)"
     - name: set head branch
       shell: bash
+      # if: ${{ !env.ACT }}
       run: |
         echo ${{ steps.pr_details.outputs.head_sha }}
-    # # For local testing, uncomment "checkout repo" and paste it in main
-    # # workflow just above where this action is being used
-    # - name: checkout repo
-    #   uses: actions/checkout@v3
+    - name: checkout repo
+      uses: actions/checkout@v3
+      # if: ${{ !env.ACT }}
       with:
         ref: ${{ steps.pr_details.outputs.head_sha }}
     - name: migration approvals

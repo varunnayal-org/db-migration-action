@@ -25,10 +25,10 @@ function buildExecutionMarkdown(htmlURL) {
 function buildConfig() {
   console.log(`Current Working Directory: ${process.cwd()}`);
   console.log(`List files in cwd: ${fs.readdirSync(process.cwd())}`);
-  console.log(path.join(process.cwd(), 'db.migration.json'));
-  console.log(fs.existsSync(path.join(process.cwd(), 'db.migration.json')));
+  console.log(path.join(process.cwd(), './db.migration.json'));
+  console.log(fs.existsSync(path.join(process.cwd(), './db.migration.json')));
   console.log('MIGRATION_CONFIG_FILE: ', process.env.MIGRATION_CONFIG_FILE);
-  const config = require(process.env.MIGRATION_CONFIG_FILE || path.join(process.cwd(), 'db.migration.json'));
+  const config = require(process.env.MIGRATION_CONFIG_FILE || path.join(process.cwd(), './db.migration.json'));
   console.log(config);
   if (!config.base_directory) {
     config.base_directory = 'migrations';
@@ -169,12 +169,6 @@ async function fromGithub(event) {
   const repoName = event.repository.name;
   const prNumber = event.issue.number;
   const commentID = event.comment.id;
-
-  buildData({
-    actionOrigin,
-    commentBody: event.comment.body,
-    commentOwner: event.comment.user.login,
-  });
 
   const result = await buildData({
     actionOrigin: 'github',
