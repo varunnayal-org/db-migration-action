@@ -23,7 +23,7 @@ function buildExecutionMarkdown(htmlURL) {
 }
 
 function buildConfig() {
-  const config = require(getEnv('MIGRATION_CONFIG_FILE'));
+  const config = require(process.env.MIGRATION_CONFIG_FILE || './db.migration.json');
   if (!config.base_directory) {
     config.base_directory = 'migrations';
   }
