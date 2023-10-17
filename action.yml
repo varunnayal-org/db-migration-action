@@ -25,6 +25,7 @@ runs:
   using: composite
   steps:
     - name: Print GitHub Context
+      shell: bash
       run: echo "${{ toJson(github) }}"
     - name: Fetch PR details
       id: pr_details
