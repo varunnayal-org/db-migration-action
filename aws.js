@@ -10,6 +10,12 @@ class Client {
     secretAccessKey = 'dummy' || process.env.AWS_SECRET_ACCESS_KEY,
     region = process.env.AWS_REGION || 'ap-south-1'
   ) {
+    console.log({
+      AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+      AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+      AWS_REGION: process.env.AWS_REGION,
+      AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL,
+    });
     let credentials;
     if (accessKeyId && secretAccessKey) {
       credentials = { accessKeyId, secretAccessKey };
@@ -19,7 +25,7 @@ class Client {
       endpoint: 'https://66ae-14-97-218-254.ngrok-free.app' || process.env.AWS_ENDPOINT_URL,
       region,
     };
-    vi;
+
     this.tableName = 'schema_migration_requests';
     this.orgName = orgName;
     this.repoName = repoName;

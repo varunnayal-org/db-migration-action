@@ -83,8 +83,6 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
   console.log(`Fetching PR info for ${repoOwner}/${repoName}#${prNumber}`);
   const prInfo = await ghClient.getPRInfo(prNumber);
 
-  new Client(organization, repoName);
-
   const errMsg = validatePR(prInfo, prBaseBranchName, commentOwner, result.dryRun);
   if (errMsg) {
     result.errMsg.invalidPR = errMsg;
