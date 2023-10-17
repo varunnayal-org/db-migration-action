@@ -6,8 +6,8 @@ class Client {
   constructor(
     orgName,
     repoName,
-    accessKeyId = process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY,
+    accessKeyId = 'dummy' || process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey = 'dummy' || process.env.AWS_SECRET_ACCESS_KEY,
     region = process.env.AWS_REGION || 'ap-south-1'
   ) {
     let credentials;
@@ -19,7 +19,7 @@ class Client {
       endpoint: 'https://66ae-14-97-218-254.ngrok-free.app' || process.env.AWS_ENDPOINT_URL,
       region,
     };
-
+    vi;
     this.tableName = 'schema_migration_requests';
     this.orgName = orgName;
     this.repoName = repoName;
