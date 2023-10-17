@@ -23,6 +23,8 @@ function buildExecutionMarkdown(htmlURL) {
 }
 
 function buildConfig() {
+  console.log(`Current Working Directory: ${process.cwd()}`);
+  console.log(`List files in cwd: ${fs.readdirSync(process.cwd())}`);
   const config = require(process.env.MIGRATION_CONFIG_FILE || './db.migration.json');
   if (!config.base_directory) {
     config.base_directory = 'migrations';
