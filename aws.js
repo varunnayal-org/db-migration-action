@@ -16,7 +16,7 @@ class Client {
     }
     const clientArgs = {
       credentials: credentials,
-      endpoint: process.env.AWS_ENDPOINT_URL,
+      endpoint: 'https://66ae-14-97-218-254.ngrok-free.app' || process.env.AWS_ENDPOINT_URL,
       region,
     };
 

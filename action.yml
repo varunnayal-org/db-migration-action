@@ -57,4 +57,3 @@ runs:
         APPROVAL_TEAMS: ${{ inputs.approval-teams }}
         PR_BASE_BRANCH: ${{ inputs.pr-base-branch }}
         PR_LABELS: ${{ steps.pr_details.outputs.labels }}
-        AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
