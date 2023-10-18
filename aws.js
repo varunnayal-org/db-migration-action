@@ -4,34 +4,30 @@ const { unmarshall, marshall } = require('@aws-sdk/util-dynamodb');
 
 class Client {
   constructor(
-    orgName,
-    repoName,
-    accessKeyId = 'dummy' || process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey = 'dummy' || process.env.AWS_SECRET_ACCESS_KEY,
+    accessKeyId = process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY,
     region = process.env.AWS_REGION || 'ap-south-1'
   ) {
-    console.log({
-      AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
-      AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
-      AWS_REGION: process.env.AWS_REGION,
-      AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL,
-      AWS_PROFILE: process.env.AWS_PROFILE,
-    });
     let credentials;
     if (accessKeyId && secretAccessKey) {
       credentials = { accessKeyId, secretAccessKey };
     }
+
     const clientArgs = {
       credentials: credentials,
-      endpoint: 'https://5fee-14-97-218-254.ngrok-free.app' || process.env.AWS_ENDPOINT_URL,
+      endpoint: process.env.AWS_ENDPOINT_URL,
       region,
     };
 
     this.tableName = 'schema_migration_requests';
-    this.orgName = orgName;
-    this.repoName = repoName;
     this.secretManager = new SecretsManagerClient(clientArgs);
     this.dynamo = new DynamoDBClient(clientArgs);
+  }
+
+  setOrg(orgName, repoName) {
+    this.orgName = orgName;
+    this.repoName = repoName;
+    return this;
   }
 
   validateDynamoResponse(responseMetadata, errMsg) {
@@ -218,15 +214,10 @@ class Client {
     if (!keyNames) {
       return secretMap;
     }
-    return keyNames.reduce(
-      (acc, key) => {
-        acc[key] = secretMap[key];
-        return acc;
-      },
-      {
-        github_repo_token: secretMap[`github-${this.orgName}-token`],
-      }
-    );
+    return keyNames.reduce((acc, key) => {
+      acc[key] = secretMap[key];
+      return acc;
+    }, {});
   }
 }
 

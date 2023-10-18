@@ -2,21 +2,36 @@ const fs = require('fs');
 const migrate = require('node-pg-migrate').default;
 const path = require('path');
 
-const { createTempDir, removeDir } = require('./util');
+const TEMP_DIR_FOR_MIGRATION = 'tmp/__migrations__';
 
-function buildMigrationConfig(databaseURL, migrationsDir, directory, dryRun = false) {
-  return {
-    databaseUrl: databaseURL,
-    dir: migrationsDir,
-    migrationsTable: directory,
-    direction: 'up',
-    checkOrder: true,
-    dryRun,
-  };
+const { createTempDir, cleanDir } = require('./util');
+
+async function buildMigrationConfigList(config, secretValues) {
+  let migrationConfigList = [];
+
+  cleanDir(TEMP_DIR_FOR_MIGRATION);
+
+  for (const dbConfig of config.databases) {
+    const sourceDir = path.join(config.base_directory, dbConfig.directory);
+    const tempMigrationSQLDir = await createTempDir(path.join(TEMP_DIR_FOR_MIGRATION, dbConfig.directory));
+
+    await ensureSQLFilesInMigrationDir(sourceDir, tempMigrationSQLDir);
+
+    migrationConfigList.push({
+      databaseUrl: secretValues[dbConfig.url_path],
+      dir: tempMigrationSQLDir,
+      migrationsTable: dbConfig.migration_table,
+      direction: 'up',
+      checkOrder: true,
+      dryRun: true,
+    });
+  }
+
+  return migrationConfigList;
 }
 
 async function runMigrationFromList(migrationConfigList) {
-  const migrationAvailable = false;
+  let migrationAvailable = false;
   let errMsg = null;
   let migratedFileList = [];
   for (const idx in migrationConfigList) {
@@ -31,10 +46,11 @@ async function runMigrationFromList(migrationConfigList) {
       }
     } catch (ex) {
       migratedFileList.push([]);
+      console.error(ex);
       if (errMsg === null) {
-        errMsg = `Dir:${migrationConfig.directory} ${ex.message}`;
+        errMsg = `Dir=${migrationConfig.directory} ${ex.message}`;
       } else {
-        errMsg = `${errMsg}\r\nDir:${migrationConfig.directory} ${ex.message}`;
+        errMsg = `${errMsg}\r\nDir=${migrationConfig.directory} ${ex.message}`;
       }
     }
   }
@@ -62,13 +78,13 @@ async function ensureSQLFilesInMigrationDir(sourceDir, destinationDir) {
 }
 
 async function runMigrations(migrationConfig) {
-  let migrationJsDir;
+  // let migrationJsDir;
   try {
     console.log('MigrationConfig: ', migrationConfig);
-    // setup sql -> js for node-pg-migrate
-    migrationJsDir = await createTempDir('migrations-js');
-    await ensureSQLFilesInMigrationDir(migrationConfig.dir, migrationJsDir);
-    migrationConfig.dir = migrationJsDir;
+    // // setup sql -> js for node-pg-migrate
+    // migrationJsDir = await createTempDir('migrations-js');
+    // await ensureSQLFilesInMigrationDir(migrationConfig.dir, migrationJsDir);
+    // migrationConfig.dir = migrationJsDir;
 
     // migrate
     // output: [{path:'/path/to/12312.sql', name: '12312', timestamp: 20230921102752}, ...]
@@ -78,8 +94,8 @@ async function runMigrations(migrationConfig) {
   } /* catch (error) {
     console.error('Failed to run migrations:', error);
   } */ finally {
-    await removeDir(migrationJsDir);
+    // await removeDir(migrationJsDir);
   }
 }
 
-module.exports = { buildMigrationConfig, runMigrationFromList, runMigrations };
+module.exports = { TEMP_DIR_FOR_MIGRATION, buildMigrationConfigList, runMigrationFromList };

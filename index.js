@@ -1,20 +1,23 @@
 const fs = require('fs');
-const { buildMigrationConfig, runMigrationFromList } = require('./migration');
+const { runMigrationFromList, buildMigrationConfigList } = require('./migration');
 const GHClient = require('./github');
 
 const { getEnv } = require('./util');
-const Client = require('./aws');
+const AWSClient = require('./aws');
+const JiraClient = require('./jira');
 const path = require('path');
+
+const awsClient = new AWSClient();
 
 function validatePR(prInfo, prBaseBranchName, commentOwner, dryRun) {
   if (prInfo.baseBranch !== prBaseBranchName) {
-    return `Base branch should be **${prBaseBranchName}**`;
+    return `Base branch should be ${prBaseBranchName}`;
   } else if (prInfo.author === commentOwner && dryRun === false) {
     return `PR author @${prInfo.author} cannot approve their own PR`;
   } else if (!prInfo.isOpen) {
-    return `PR is in **${prInfo.state}** state`;
+    return `PR is in ${prInfo.state} state`;
   } else if (prInfo.isDraft) {
-    return `PR is in **draft** state`;
+    return `PR is in draft state`;
   }
 }
 
@@ -23,16 +26,48 @@ function buildExecutionMarkdown(htmlURL) {
 }
 
 function buildConfig() {
-  console.log(`Current Working Directory: ${process.cwd()}`);
-  console.log(`List files in cwd: ${fs.readdirSync(process.cwd())}`);
-  console.log(path.join(process.cwd(), './db.migration.json'));
-  console.log(fs.existsSync(path.join(process.cwd(), './db.migration.json')));
-  console.log('MIGRATION_CONFIG_FILE: ', process.env.MIGRATION_CONFIG_FILE);
   const config = require(process.env.MIGRATION_CONFIG_FILE || path.join(process.cwd(), './db.migration.json'));
-  console.log(config);
   if (!config.base_directory) {
     config.base_directory = 'migrations';
   }
+
+  if (!config.tokens) {
+    config.tokens = tokens;
+  }
+  if (!config.tokens.github_token) {
+    config.tokens.github_token = 'GH_TOKEN';
+  }
+  if (!config.tokens.jira_token) {
+    config.tokens.jira_token = 'JIRA_TOKEN';
+  }
+  if (!config.tokens.jira_user) {
+    config.tokens.jira_user = 'JIRA_USER';
+  }
+
+  if (!config.jira) {
+    throw new Error('jira config is missing');
+  }
+  if (!config.jira.issue_type) {
+    config.jira.issue_type = 'Story';
+  }
+  if (!config.jira.ticket_label) {
+    config.jira.ticket_label = 'db-migration';
+  }
+
+  if (!config.base_directory) {
+    config.base_directory = 'migrations';
+  }
+
+  config.databases.map((dbConfig) => {
+    if (!dbConfig.directory) {
+      dbConfig.directory = '.';
+    }
+    if (!dbConfig.migration_table) {
+      dbConfig.migration_table = 'migrations';
+    }
+  });
+  console.log('Config: ', config);
+
   return config;
 }
 
@@ -40,15 +75,37 @@ const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
 const prBaseBranchName = getEnv('PR_BASE_BRANCH');
 const config = buildConfig();
 
-async function buildData({ actionOrigin, organization, repoOwner, repoName, prNumber, commentBody, commentOwner }) {
+async function buildData({
+  actionOrigin,
+  organization,
+  repoOwner,
+  repoName,
+  prNumber,
+  commentBody,
+  commentOwner,
+  awsSecrets,
+}) {
   const result = {
     msgPrefix: 'Migrations',
     dryRun: false,
-    invalidComment: false,
-    ghClient: null,
-    awsClient: null,
+    ghClient: new GHClient(organization, repoOwner, repoName, getEnv('REPO_TOKEN')),
+    awsClient: null, // not required here
+    jiraClient: new JiraClient({
+      repoOwner,
+      repoName,
+      apiToken: getEnv(config.tokens.jira_token, awsSecrets),
+      apiUser: getEnv(config.tokens.jira_user, awsSecrets),
+      jiraDomain: config.jira.domain,
+      project: config.jira.project,
+      issueType: config.jira.issue_type,
+      ticketLabel: config.jira.ticket_label,
+      statusIDInitial: config.jira.status_id_initial,
+      statusIDCompleted: config.jira.status_id_completed,
+      customFieldPRLink: config.jira.custom_field_pr_link,
+    }),
 
     migrationConfigList: [],
+    migrationAvailable: false,
     migratedFileList: [],
 
     errorMessage: null,
@@ -61,13 +118,15 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
     },
   };
 
+  const ghClient = result.ghClient;
+
   commentBody = commentBody.trim();
   if (commentBody == '/migrate approved') {
     result.dryRun = false;
   } else if (commentBody == '/migrate dry-run') {
+    result.msgPrefix = '[DryRun]Migrations';
     result.dryRun = true;
   } else {
-    console.debug('ignoring comment');
     result.errMsg.invalidComment = 'ignoring comment';
     result.errorMessage = result.errMsg.invalidComment;
     return result;
@@ -77,17 +136,14 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
     result.msgPrefix = '[DryRun]Migrations';
   }
 
-  const ghClient = new GHClient(organization, repoOwner, repoName, getEnv('REPO_TOKEN'));
-  result.ghClient = ghClient;
-
   console.log(`Fetching PR info for ${repoOwner}/${repoName}#${prNumber}`);
+
   const prInfo = await ghClient.getPRInfo(prNumber);
 
   const errMsg = validatePR(prInfo, prBaseBranchName, commentOwner, result.dryRun);
   if (errMsg) {
     result.errMsg.invalidPR = errMsg;
     result.errorMessage = result.errMsg.invalidPR;
-    console.error(errMsg);
     return result;
   }
 
@@ -97,30 +153,12 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
 
     if (matchingTeams.length === 0) {
       result.errMsg.invalidTeam = `User ${commentOwner} is not a member of any of the required teams: ${config.teams}`;
-      console.error(result.errMsg.invalidTeam);
       result.errorMessage = result.errMsg.invalidTeam;
       return result;
     }
   }
 
-  const awsClient = new Client(organization, repoName);
-  result.awsClient = awsClient;
-
-  const secretKeys = config.databases.map((db) => db.url_path);
-  const secretValues = await awsClient.getSecrets(config.aws_secret_provider.path, secretKeys);
-
-  result.migrationConfigList = config.databases.map((db) => {
-    const { directory, url_path } = db;
-    if (!directory) {
-      db.directory = 'migrations';
-    }
-    return buildMigrationConfig(
-      secretValues[url_path],
-      directory,
-      path.join(config.base_directory, db.directory),
-      true
-    );
-  });
+  result.migrationConfigList = await buildMigrationConfigList(config, awsSecrets);
 
   const {
     migrationAvailable,
@@ -129,19 +167,24 @@ async function buildData({ actionOrigin, organization, repoOwner, repoName, prNu
   } = await runMigrationFromList(result.migrationConfigList);
 
   result.migratedFileList = migratedFileList;
+  result.migrationAvailable = migrationAvailable;
   if (migrationErrMsg) {
     result.errMsg.invalidDryRun = migrationErrMsg;
-    console.error(migrationErrMsg);
     result.errorMessage = migrationErrMsg;
     return result;
   } else if (migrationAvailable === false) {
     result.errMsg.noFilesToRun = 'No migrations available';
-    console.debug(result.errMsg.noFilesToRun);
     result.errorMessage = result.errMsg.noFilesToRun;
     return result;
   }
 
   return result;
+}
+
+function buildJiraDescription(organization, repoName, prNumber, fileListForComment) {
+  return `[PR ${organization}/${repoName}#${prNumber}|https://github.com/${organization}/${repoName}/pull/${prNumber}]
+${fileListForComment}
+`;
 }
 
 function dt() {
@@ -150,7 +193,7 @@ function dt() {
   });
 }
 
-async function fromJira(event) {}
+async function fromJira(event, awsSecrets) {}
 
 /**
  * - Get PR info
@@ -163,12 +206,15 @@ async function fromJira(event) {}
  * @param {*} event
  * @returns
  */
-async function fromGithub(event) {
+async function fromGithub(event, awsSecrets) {
   const organization = event.organization.login; // for orgs, this and repoOwner are same
   const repoOwner = event.repository.owner.login;
   const repoName = event.repository.name;
+  const prAPIUrl = event.issue.pull_request.url;
   const prNumber = event.issue.number;
   const commentID = event.comment.id;
+
+  awsClient.setOrg(organization, repoName);
 
   const result = await buildData({
     actionOrigin: 'github',
@@ -178,18 +224,31 @@ async function fromGithub(event) {
     prNumber,
     commentBody: event.comment.body,
     commentOwner: event.comment.user.login,
+    awsSecrets,
   });
+  result.awsClient = awsClient;
 
   console.log('Result: ', result);
   const commentBuilder = getUpdatedComment(event.comment.body, result.msgPrefix);
 
   const ghClient = result.ghClient;
   if (result.errorMessage) {
-    if (result.errMsg.noFilesToRun === null) {
+    if (result.errMsg.invalidComment === null) {
+      console.error(result.errorMessage);
       await ghClient.updateComment(commentID, commentBuilder('failed', result.errorMessage));
+      throw new Error(result.errorMessage);
     }
-    throw new Error(result.errorMessage);
+    console.debug(result.errorMessage);
+    return;
   }
+
+  // migration files are available. Ensure we have a ticket handy
+  const { alreadyExists, issue: jiraIssue } = result.jiraClient.ensureJiraTicket(
+    prNumber,
+    buildJiraDescription(organization, repoName, prNumber, getFileListingForComment(result.migratedFileList)),
+    null,
+    prAPIUrl
+  );
 
   let updatedCommentMsg = null;
   let migrationFileListByDirectory = result.migratedFileList;
@@ -219,12 +278,19 @@ async function fromGithub(event) {
     updatedCommentMsg = commentBuilder('successful');
   }
 
-  updatedCommentMsg = `${updatedCommentMsg}\r\n${getFileListingForComment(migrationFileListByDirectory)}`;
+  const fileListForComment = getFileListingForComment(migrationFileListByDirectory);
+  updatedCommentMsg = `${updatedCommentMsg}\r\n${fileListForComment}`;
 
   // Update comment and add label
   await Promise.all([
     ghClient.updateComment(commentID, updatedCommentMsg),
-    migratedFileList.length > 0 // && dryRun === false
+    alreadyExists === true
+      ? result.jiraClient.addComment(
+          jiraIssue.id,
+          buildJiraDescription(organization, repoName, prNumber, updatedCommentMsg)
+        )
+      : Promise.resolve(true),
+    result.migrationAvailable === true // && dryRun === false
       ? ghClient.addLabel(prNumber, 'db-migration')
       : Promise.resolve(true),
   ]);
@@ -275,10 +341,23 @@ function getFileListingForComment(migrationFileListByDirectory) {
 }
 
 async function main() {
+  const secretKeys = config.databases.reduce(
+    (acc, db) => {
+      acc.push(db.url_path);
+      return acc;
+    },
+    [config.tokens.github_token, config.tokens.jira_token, config.tokens.jira_user]
+  );
+  const awsSecrets = await awsClient.getSecrets(config.aws_secret_provider.path, secretKeys);
+
+  console.log(event.action);
+
+  console.log(event);
+
   if (event.action !== 'jira_issue_comment_created') {
-    await fromGithub(event);
+    await fromGithub(event, awsSecrets);
   } else {
-    await fromJira(event);
+    await fromJira(event, awsSecrets);
   }
 }
 

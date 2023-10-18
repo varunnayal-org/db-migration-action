@@ -1,19 +1,29 @@
 const fs = require('fs');
 
+async function cleanDir(dirName) {
+  try {
+    fs.rmSync(dirName, { recursive: true });
+  } catch (ex) {
+    if (ex.code !== 'ENOENT') {
+      throw ex;
+    }
+  }
+}
+
 async function createTempDir(dirName) {
-  const tempDir = `${process.env.RUNNER_TEMP}/${dirName}`;
-  fs.mkdirSync(tempDir);
-  return tempDir;
+  fs.mkdirSync(dirName, { recursive: true });
+  return dirName;
 }
 
 async function removeDir(dirName) {
+  console.log('Removing Dir: ', dirName);
   if (dirName) {
     fs.rmSync(dirName, { recursive: true });
   }
 }
 
-function getEnv(envName) {
-  const value = process.env[envName];
+function getEnv(envName, fromState = process.env) {
+  const value = fromState[envName];
   if (typeof value === 'undefined') {
     throw new Error(`Environment variable ${envName} is not set`);
   }
@@ -23,5 +33,6 @@ function getEnv(envName) {
 module.exports = {
   createTempDir,
   removeDir,
+  cleanDir,
   getEnv,
 };

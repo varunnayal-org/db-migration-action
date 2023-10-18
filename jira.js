@@ -13,9 +13,26 @@ class Client {
     // To find issue status ID, use
     // https://{jiraDomain}.atlassian.net/rest/api/2/issue/{issueOrKey}/transitions
     // and pick "id" value
-    initialStatusID,
+    statusIDInitial,
+    statusIDCompleted,
+
+    // To find custom field ID, use
+    // https://{jiraDomain}.atlassian.net/secure/admin/ViewCustomFields.jspa
+    // select field and pick "id" in URL (id=12344)
+    // So value should be "customfield_12345"
+    customFieldPRLink,
   }) {
-    if (!repoOwner || !repoName || !apiToken || !apiUser || !jiraDomain || !project || !initialStatusID) {
+    if (
+      !repoOwner ||
+      !repoName ||
+      !apiToken ||
+      !apiUser ||
+      !jiraDomain ||
+      !project ||
+      !statusIDInitial ||
+      !statusIDCompleted ||
+      !customFieldPRLink
+    ) {
       throw new Error('Missing required arguments');
     }
 
@@ -29,7 +46,9 @@ class Client {
     this.project = project;
     this.ticketLabel = ticketLabel;
     this.issueType = issueType;
-    this.initialStatusID = initialStatusID;
+    this.statusIDInitial = statusIDInitial;
+    this.statusIDCompleted = statusIDCompleted;
+    this.customFieldPRLink = customFieldPRLink;
 
     this.baseURL = `https://${jiraDomain}.atlassian.net/rest/api/2`;
 
@@ -42,10 +61,10 @@ class Client {
       },
     });
 
-    this.client.interceptors.request.use((req) => {
-      // console.log(`Starting Request: ${JSON.stringify(req, null, 2)}`);
-      return req;
-    });
+    // this.client.interceptors.request.use((req) => {
+    //   console.log(`Starting Request: ${JSON.stringify(req, null, 2)}`);
+    //   return req;
+    // });
   }
 
   getSearchToken(prNumber) {
@@ -67,17 +86,60 @@ class Client {
     }
   }
 
-  async searchJiraTicket(prNumber) {
-    const response = await this.#makeAPICall('/search', {
+  async #search(searchText) {
+    const jql = `project=${this.project} AND labels=${this.ticketLabel} AND ${searchText}`;
+    console.log(`Search Text: ${jql}`);
+    const response = await this.#makeAPICall('get', '/search', {
       params: {
-        jql: `project=SCHEMA AND labels=${this.ticketLabel} AND summary~"${this.getSearchToken(prNumber)}"`,
+        jql,
       },
     });
 
+    if (response.data.issues.length === 0) {
+      return null;
+    } else if (response.data.issues.length > 1) {
+      throw new Error(`Found multiple tickets for ${searchText}`);
+    }
     return response.data.issues[0];
   }
 
-  async createJiraTicket(prNumber, description, assigneeName) {
+  async searchJiraTicket(prNumber) {
+    return this.#search(`summary~"${this.getSearchToken(prNumber)}"`);
+  }
+
+  async ensureJiraTicket(prNumber, description, assigneeName, prLink) {
+    // const issue = await this.#search(`${this.customFieldPRLink} = "${prLink}"`);
+    const issue = await this.searchJiraTicket(prNumber);
+
+    if (issue != null) {
+      console.debug('Ticket already present', issue);
+      return {
+        alreadyExists: true,
+        issue,
+      };
+    }
+
+    console.debug('Creating new Ticket');
+    return {
+      alreadyExists: false,
+      issue: await this.createJiraTicket(prNumber, description, assigneeName, prLink),
+    };
+  }
+
+  async addComment(issueId, message) {
+    const response = await this.#makeAPICall('post', `/issue/${issueId}/comment`, {
+      body: message,
+    });
+
+    const comment = response.data;
+    return {
+      id: comment.id,
+      self: comment.self,
+      body: comment.body,
+    };
+  }
+
+  async createJiraTicket(prNumber, description, assigneeName, prLink) {
     const createJiraTicketParams = {
       fields: {
         project: {
@@ -89,20 +151,19 @@ class Client {
         },
         labels: [this.ticketLabel],
         description: description,
-        assignee: {
-          name: assigneeName,
-        },
+        [this.customFieldPRLink]: prLink,
       },
     };
+    if (assigneeName) {
+      createJiraTicketParams.fields.assignee = {
+        name: assigneeName,
+      };
+    }
     const response = await this.#makeAPICall('post', '/issue', createJiraTicketParams);
 
-    console.log('created...');
+    console.debug('JIRA created');
 
-    this.#makeAPICall('post', `/issue/${response.data.id}/transitions`, {
-      transition: {
-        id: this.initialStatusID,
-      },
-    }).catch((ex) => console.error(`Unable to transition issue ${response.data.key} to ${this.initialStatusID}`, ex));
+    await this.transition(response.data.id, this.statusIDInitial);
 
     /*
     {
@@ -112,6 +173,14 @@ class Client {
     }
     */
     return response.data;
+  }
+
+  async transition(issueId, transitionID) {
+    return this.#makeAPICall('post', `/issue/${issueId}/transitions`, {
+      transition: {
+        id: transitionID,
+      },
+    }).catch((ex) => console.error(`Unable to transition issue ${response.data.key} to ${this.statusIDInitial}`, ex));
   }
 }
 
