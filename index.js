@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { runMigrations, buildMigrationConfig } = require('./migration');
+const { buildMigrationConfig, runMigrationFromList } = require('./migration');
 const GHClient = require('./github');
 
 const { getEnv } = require('./util');
@@ -272,36 +272,6 @@ function getFileListingForComment(migrationFileListByDirectory) {
       return acc;
     }, [])
     .join('\r\n');
-}
-
-async function runMigrationFromList(migrationConfigList) {
-  const migrationAvailable = false;
-  let errMsg = null;
-  let migratedFileList = [];
-  for (const idx in migrationConfigList) {
-    const migrationConfig = migrationConfigList[idx];
-    try {
-      const migratedFiles = await runMigrations(migrationConfig);
-      if (migratedFiles.length > 0) {
-        migratedFileList.push(migratedFiles);
-        migrationAvailable = true;
-      } else {
-        migratedFileList.push([]);
-      }
-    } catch (ex) {
-      migratedFileList.push([]);
-      if (errMsg === null) {
-        errMsg = `Dir:${migrationConfig.directory} ${ex.message}`;
-      } else {
-        errMsg = `${errMsg}\r\nDir:${migrationConfig.directory} ${ex.message}`;
-      }
-    }
-  }
-  return {
-    migrationAvailable,
-    migratedFileList,
-    errMsg,
-  };
 }
 
 async function main() {

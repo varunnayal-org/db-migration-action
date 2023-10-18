@@ -15,6 +15,36 @@ function buildMigrationConfig(databaseURL, migrationsDir, directory, dryRun = fa
   };
 }
 
+async function runMigrationFromList(migrationConfigList) {
+  const migrationAvailable = false;
+  let errMsg = null;
+  let migratedFileList = [];
+  for (const idx in migrationConfigList) {
+    const migrationConfig = migrationConfigList[idx];
+    try {
+      const migratedFiles = await runMigrations(migrationConfig);
+      if (migratedFiles.length > 0) {
+        migratedFileList.push(migratedFiles);
+        migrationAvailable = true;
+      } else {
+        migratedFileList.push([]);
+      }
+    } catch (ex) {
+      migratedFileList.push([]);
+      if (errMsg === null) {
+        errMsg = `Dir:${migrationConfig.directory} ${ex.message}`;
+      } else {
+        errMsg = `${errMsg}\r\nDir:${migrationConfig.directory} ${ex.message}`;
+      }
+    }
+  }
+  return {
+    migrationAvailable,
+    migratedFileList,
+    errMsg,
+  };
+}
+
 async function ensureSQLFilesInMigrationDir(sourceDir, destinationDir) {
   // Read files in source directory
   console.debug(`Reading from: ${sourceDir}`);
@@ -23,6 +53,7 @@ async function ensureSQLFilesInMigrationDir(sourceDir, destinationDir) {
   // Filter only SQL files
   const sqlFiles = files.filter((file) => path.extname(file) === '.sql');
 
+  console.debug('SQL Files: ', sqlFiles);
   // Copy files to destination dir
   for (const file of sqlFiles) {
     const filePath = path.join(sourceDir, file);
@@ -33,6 +64,7 @@ async function ensureSQLFilesInMigrationDir(sourceDir, destinationDir) {
 async function runMigrations(migrationConfig) {
   let migrationJsDir;
   try {
+    console.log('MigrationConfig: ', migrationConfig);
     // setup sql -> js for node-pg-migrate
     migrationJsDir = await createTempDir('migrations-js');
     await ensureSQLFilesInMigrationDir(migrationConfig.dir, migrationJsDir);
@@ -50,4 +82,4 @@ async function runMigrations(migrationConfig) {
   }
 }
 
-module.exports = { buildMigrationConfig, runMigrations };
+module.exports = { buildMigrationConfig, runMigrationFromList, runMigrations };
