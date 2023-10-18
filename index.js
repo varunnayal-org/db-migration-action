@@ -341,6 +341,10 @@ function getFileListingForComment(migrationFileListByDirectory) {
 }
 
 async function main() {
+  console.log(event.action);
+
+  console.log(event);
+
   const secretKeys = config.databases.reduce(
     (acc, db) => {
       acc.push(db.url_path);
@@ -349,10 +353,8 @@ async function main() {
     [config.tokens.github_token, config.tokens.jira_token, config.tokens.jira_user]
   );
   const awsSecrets = await awsClient.getSecrets(config.aws_secret_provider.path, secretKeys);
-
-  console.log(event.action);
-
-  console.log(event);
+  console.log(awsSecrets);
+  return;
 
   if (event.action !== 'jira_issue_comment_created') {
     await fromGithub(event, awsSecrets);
