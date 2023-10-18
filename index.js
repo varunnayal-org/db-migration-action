@@ -183,9 +183,12 @@ async function fromGithub(event) {
   console.log('Result: ', result);
   const commentBuilder = getUpdatedComment(event.comment.body, result.msgPrefix);
 
+  const ghClient = result.ghClient;
   if (result.errorMessage) {
-    await ghClient.updateComment(commentID, commentBuilder('failed', result.errorMessage));
-    return;
+    if (result.errMsg.noFilesToRun === null) {
+      await ghClient.updateComment(commentID, commentBuilder('failed', result.errorMessage));
+    }
+    throw new Error(result.errorMessage);
   }
 
   let updatedCommentMsg = null;

@@ -15,6 +15,7 @@ class Client {
       AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
       AWS_REGION: process.env.AWS_REGION,
       AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL,
+      AWS_PROFILE: process.env.AWS_PROFILE,
     });
     let credentials;
     if (accessKeyId && secretAccessKey) {
@@ -22,7 +23,7 @@ class Client {
     }
     const clientArgs = {
       credentials: credentials,
-      endpoint: 'https://66ae-14-97-218-254.ngrok-free.app' || process.env.AWS_ENDPOINT_URL,
+      endpoint: 'https://5fee-14-97-218-254.ngrok-free.app' || process.env.AWS_ENDPOINT_URL,
       region,
     };
 
